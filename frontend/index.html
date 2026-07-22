@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Resume Screening System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background:#0B0F14; }
+  .font-display { font-family: 'Space Grotesk', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #11161D; }
+  ::-webkit-scrollbar-thumb { background: #2A3441; border-radius: 4px; }
+  .glass { background: rgba(17, 22, 29, 0.7); backdrop-filter: blur(12px); }
+  .score-ring { transition: stroke-dashoffset 0.6s ease; }
+  .row-enter { animation: rowIn 0.35s ease both; }
+  @keyframes rowIn { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform: translateY(0);} }
+  .drag-active { border-color: #7DD3C0 !important; background: rgba(125,211,192,0.06) !important; }
+  .skill-chip { transition: all 0.15s ease; }
+</style>
+</head>
+<body class="text-slate-200 min-h-screen">
+
+<div id="app">
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="border-b border-slate-800/80 sticky top-0 z-40 glass">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-md bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center font-display font-bold text-slate-900 text-sm">AI</div>
+        <div>
+          <div class="font-display font-semibold text-slate-100 leading-none">Resume Screener</div>
+          <div class="text-[11px] text-slate-500 font-mono mt-0.5">v1.0 — local instance</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+        <span id="statusText" class="text-slate-500">connecting…</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- ===================== VIEW: JOB LIST ===================== -->
+    <section id="view-jobs">
+      <div class="flex items-end justify-between mb-6">
+        <div>
+          <h1 class="font-display text-2xl font-semibold text-slate-100">Job Postings</h1>
+          <p class="text-slate-500 text-sm mt-1">Create a posting, then upload resumes to rank candidates automatically.</p>
+        </div>
+        <button onclick="openNewJobForm()" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-semibold text-sm px-4 py-2.5 rounded-lg transition flex items-center gap-2">
+          <span class="text-lg leading-none">+</span> New Job
+        </button>
+      </div>
+
+      <!-- New Job Form -->
+      <div id="newJobForm" class="hidden mb-8 border border-slate-800 rounded-xl p-6 bg-slate-900/50">
+        <h2 class="font-display font-semibold text-slate-100 mb-4">New Job Posting</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-mono text-slate-500 mb-1.5 uppercase tracking-wide">Job Title</label>
+            <input id="jobTitleInput" type="text" placeholder="e.g. Senior Backend Engineer"
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-mono text-slate-500 mb-1.5 uppercase tracking-wide">Job Description</label>
+            <textarea id="jobDescInput" rows="6" placeholder="Paste the full job description here. Required skills will be auto-detected, or you can specify them manually below."
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 resize-y"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-mono text-slate-500 mb-1.5 uppercase tracking-wide">Required Skills <span class="text-slate-600 normal-case">(optional — comma separated, auto-detected if left blank)</span></label>
+            <input id="jobSkillsInput" type="text" placeholder="e.g. python, fastapi, postgresql, docker"
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button onclick="submitNewJob()" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-semibold text-sm px-4 py-2.5 rounded-lg transition">Create Job</button>
+            <button onclick="closeNewJobForm()" class="text-slate-400 hover:text-slate-200 text-sm px-4 py-2.5 transition">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="jobsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="jobsEmpty" class="hidden text-center py-20 text-slate-600">
+        <div class="font-display text-lg text-slate-500 mb-1">No jobs yet</div>
+        <div class="text-sm">Create your first job posting to start screening resumes.</div>
+      </div>
+    </section>
+
+    <!-- ===================== VIEW: JOB DETAIL / CANDIDATES ===================== -->
+    <section id="view-job-detail" class="hidden">
+      <button onclick="goToJobsList()" class="text-slate-500 hover:text-slate-300 text-sm mb-4 flex items-center gap-1.5 transition">
+        <span>←</span> All jobs
+      </button>
+
+      <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 id="jobDetailTitle" class="font-display text-2xl font-semibold text-slate-100"></h1>
+          <div id="jobDetailSkills" class="flex flex-wrap gap-1.5 mt-3"></div>
+        </div>
+        <label class="shrink-0 cursor-pointer">
+          <input id="resumeFileInput" type="file" multiple accept=".pdf,.docx,.txt" class="hidden" onchange="handleFileSelect(event)" />
+          <div id="uploadDropzone" class="border-2 border-dashed border-slate-700 hover:border-teal-500/60 rounded-lg px-6 py-4 text-center transition min-w-[220px]">
+            <div class="text-sm text-slate-300 font-medium">📄 Upload Resumes</div>
+            <div class="text-xs text-slate-600 mt-1">PDF, DOCX, or TXT — drag & drop</div>
+          </div>
+        </label>
+      </div>
+
+      <div id="uploadProgress" class="hidden mb-6 text-sm text-teal-400 font-mono flex items-center gap-2">
+        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+        <span id="uploadProgressText">Analyzing resumes…</span>
+      </div>
+
+      <div id="uploadError" class="hidden mb-6 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-4 py-3"></div>
+
+      <!-- Ranked candidates table -->
+      <div id="candidatesWrap">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-display font-semibold text-slate-300 text-sm uppercase tracking-wide">Ranked Candidates</h2>
+          <span id="candidateCount" class="text-xs font-mono text-slate-600"></span>
+        </div>
+        <div id="candidatesList" class="space-y-2"></div>
+        <div id="candidatesEmpty" class="hidden text-center py-16 text-slate-600 border border-dashed border-slate-800 rounded-xl">
+          <div class="text-sm">No resumes uploaded yet for this job.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== VIEW: CANDIDATE DETAIL ===================== -->
+    <section id="view-candidate-detail" class="hidden">
+      <button onclick="goToJobDetail()" class="text-slate-500 hover:text-slate-300 text-sm mb-4 flex items-center gap-1.5 transition">
+        <span>←</span> Back to candidates
+      </button>
+      <div id="candidateDetailContent"></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const API = ""; // same-origin, served by FastAPI
+
+let state = {
+  jobs: [],
+  currentJobId: null,
+  currentJob: null,
+  candidates: [],
+  currentCandidateId: null,
+};
+
+// ---------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------
+async function api(path, options = {}) {
+  const res = await fetch(API + path, options);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const j = await res.json(); detail = j.detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function checkHealth() {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  try {
+    await api('/api/health');
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+    text.textContent = 'connected';
+    text.className = 'text-emerald-500';
+  } catch (e) {
+    dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+    text.textContent = 'backend unreachable';
+    text.className = 'text-rose-500';
+  }
+}
+
+// ---------------------------------------------------------------
+// Jobs list view
+// ---------------------------------------------------------------
+async function loadJobs() {
+  try {
+    state.jobs = await api('/api/jobs');
+    renderJobs();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderJobs() {
+  const list = document.getElementById('jobsList');
+  const empty = document.getElementById('jobsEmpty');
+  if (state.jobs.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  list.innerHTML = state.jobs.map(job => `
+    <div onclick="openJob(${job.id})" class="row-enter cursor-pointer border border-slate-800 hover:border-teal-600/50 bg-slate-900/40 hover:bg-slate-900/70 rounded-xl p-5 transition group">
+      <div class="flex items-start justify-between mb-2">
+        <h3 class="font-display font-semibold text-slate-100 group-hover:text-teal-300 transition">${escapeHtml(job.title)}</h3>
+        <button onclick="event.stopPropagation(); deleteJob(${job.id})" class="text-slate-700 hover:text-rose-400 text-xs shrink-0 ml-2 mt-0.5 transition">✕</button>
+      </div>
+      <p class="text-slate-500 text-xs leading-relaxed mb-3">${escapeHtml(job.description.slice(0,140))}${job.description.length > 140 ? '…' : ''}</p>
+      <div class="flex items-center justify-between text-xs font-mono">
+        <span class="text-slate-600">${job.required_skills.length} required skills</span>
+        <span class="text-teal-500">${job.candidate_count} candidate${job.candidate_count === 1 ? '' : 's'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openNewJobForm() {
+  document.getElementById('newJobForm').classList.remove('hidden');
+  document.getElementById('jobTitleInput').focus();
+}
+function closeNewJobForm() {
+  document.getElementById('newJobForm').classList.add('hidden');
+  document.getElementById('jobTitleInput').value = '';
+  document.getElementById('jobDescInput').value = '';
+  document.getElementById('jobSkillsInput').value = '';
+}
+
+async function submitNewJob() {
+  const title = document.getElementById('jobTitleInput').value.trim();
+  const description = document.getElementById('jobDescInput').value.trim();
+  const skillsRaw = document.getElementById('jobSkillsInput').value.trim();
+
+  if (!title || !description) {
+    alert('Please provide both a job title and description.');
+    return;
+  }
+  const payload = { title, description };
+  if (skillsRaw) {
+    payload.required_skills = skillsRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+  try {
+    await api('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeNewJobForm();
+    await loadJobs();
+  } catch (e) {
+    alert('Failed to create job: ' + e.message);
+  }
+}
+
+async function deleteJob(jobId) {
+  if (!confirm('Delete this job and all its candidates?')) return;
+  try {
+    await api(`/api/jobs/${jobId}`, { method: 'DELETE' });
+    await loadJobs();
+  } catch (e) {
+    alert('Failed to delete job: ' + e.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// Job detail / candidates view
+// ---------------------------------------------------------------
+async function openJob(jobId) {
+  state.currentJobId = jobId;
+  document.getElementById('view-jobs').classList.add('hidden');
+  document.getElementById('view-job-detail').classList.remove('hidden');
+  document.getElementById('view-candidate-detail').classList.add('hidden');
+  await loadJobDetail();
+}
+
+function goToJobsList() {
+  document.getElementById('view-jobs').classList.remove('hidden');
+  document.getElementById('view-job-detail').classList.add('hidden');
+  document.getElementById('view-candidate-detail').classList.add('hidden');
+  loadJobs();
+}
+
+async function loadJobDetail() {
+  try {
+    state.currentJob = await api(`/api/jobs/${state.currentJobId}`);
+    document.getElementById('jobDetailTitle').textContent = state.currentJob.title;
+    document.getElementById('jobDetailSkills').innerHTML = state.currentJob.required_skills.map(s =>
+      `<span class="skill-chip text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">${escapeHtml(s)}</span>`
+    ).join('');
+    await loadCandidates();
+  } catch (e) {
+    alert('Failed to load job: ' + e.message);
+    goToJobsList();
+  }
+}
+
+async function loadCandidates() {
+  state.candidates = await api(`/api/jobs/${state.currentJobId}/candidates`);
+  renderCandidates();
+}
+
+function scoreColor(score) {
+  if (score >= 75) return { ring: '#34d399', text: 'text-emerald-400', bg: 'bg-emerald-500/10' };
+  if (score >= 50) return { ring: '#fbbf24', text: 'text-amber-400', bg: 'bg-amber-500/10' };
+  return { ring: '#f87171', text: 'text-rose-400', bg: 'bg-rose-500/10' };
+}
+
+function scoreRingSvg(score, size = 44) {
+  const r = (size - 6) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - score / 100);
+  const c = scoreColor(score);
+  return `
+    <svg width="${size}" height="${size}" class="shrink-0 -rotate-90">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="#1E2733" stroke-width="4" fill="none" />
+      <circle class="score-ring" cx="${size/2}" cy="${size/2}" r="${r}" stroke="${c.ring}" stroke-width="4" fill="none"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
+function renderCandidates() {
+  const list = document.getElementById('candidatesList');
+  const empty = document.getElementById('candidatesEmpty');
+  const count = document.getElementById('candidateCount');
+
+  count.textContent = `${state.candidates.length} total`;
+
+  if (state.candidates.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = state.candidates.map((c, i) => {
+    const colors = scoreColor(c.final_score);
+    return `
+    <div onclick="openCandidate(${c.id})" style="animation-delay:${i * 40}ms"
+      class="row-enter cursor-pointer border border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/70 rounded-xl p-4 flex items-center gap-4 transition group">
+      <div class="font-mono text-slate-700 text-sm w-6 text-center shrink-0">${i + 1}</div>
+      <div class="relative flex items-center justify-center shrink-0">
+        ${scoreRingSvg(c.final_score)}
+        <span class="absolute font-mono text-xs font-semibold ${colors.text}">${Math.round(c.final_score)}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-medium text-slate-100 group-hover:text-teal-300 transition truncate">${escapeHtml(c.name || c.filename)}</div>
+        <div class="text-xs text-slate-500 truncate mt-0.5">${escapeHtml(c.email || 'no email detected')} ${c.years_experience ? '· ' + c.years_experience + ' yrs exp' : ''}</div>
+      </div>
+      <div class="hidden sm:flex flex-wrap gap-1 max-w-xs justify-end">
+        ${c.matched_skills.slice(0, 4).map(s => `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${escapeHtml(s)}</span>`).join('')}
+        ${c.matched_skills.length > 4 ? `<span class="text-[10px] font-mono px-1.5 py-0.5 text-slate-600">+${c.matched_skills.length - 4}</span>` : ''}
+      </div>
+      <div class="text-slate-700 group-hover:text-slate-400 transition shrink-0">→</div>
+    </div>
+  `}).join('');
+}
+
+// ---------------------------------------------------------------
+// Upload handling
+// ---------------------------------------------------------------
+function handleFileSelect(event) {
+  const files = event.target.files;
+  if (files.length) uploadResumes(files);
+}
+
+const dropzone = document.getElementById('uploadDropzone');
+['dragenter', 'dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag-active'); });
+});
+['dragleave', 'drop'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag-active'); });
+});
+dropzone.addEventListener('drop', e => {
+  const files = e.dataTransfer.files;
+  if (files.length) uploadResumes(files);
+});
+
+async function uploadResumes(files) {
+  const progress = document.getElementById('uploadProgress');
+  const progressText = document.getElementById('uploadProgressText');
+  const errorBox = document.getElementById('uploadError');
+  errorBox.classList.add('hidden');
+  progress.classList.remove('hidden');
+  progressText.textContent = `Analyzing ${files.length} resume${files.length > 1 ? 's' : ''}…`;
+
+  const formData = new FormData();
+  for (const f of files) formData.append('files', f);
+
+  try {
+    await api(`/api/jobs/${state.currentJobId}/resumes`, {
+      method: 'POST',
+      body: formData,
+    });
+    await loadCandidates();
+  } catch (e) {
+    errorBox.textContent = e.message;
+    errorBox.classList.remove('hidden');
+  } finally {
+    progress.classList.add('hidden');
+    document.getElementById('resumeFileInput').value = '';
+  }
+}
+
+// ---------------------------------------------------------------
+// Candidate detail view
+// ---------------------------------------------------------------
+async function openCandidate(candidateId) {
+  state.currentCandidateId = candidateId;
+  document.getElementById('view-job-detail').classList.add('hidden');
+  document.getElementById('view-candidate-detail').classList.remove('hidden');
+  try {
+    const c = await api(`/api/candidates/${candidateId}`);
+    renderCandidateDetail(c);
+  } catch (e) {
+    alert('Failed to load candidate: ' + e.message);
+  }
+}
+
+function goToJobDetail() {
+  document.getElementById('view-job-detail').classList.remove('hidden');
+  document.getElementById('view-candidate-detail').classList.add('hidden');
+}
+
+function renderCandidateDetail(c) {
+  const colors = scoreColor(c.final_score);
+  const el = document.getElementById('candidateDetailContent');
+  el.innerHTML = `
+    <div class="flex flex-col md:flex-row gap-6">
+      <div class="md:w-64 shrink-0 space-y-4">
+        <div class="border border-slate-800 rounded-xl p-5 text-center bg-slate-900/40">
+          <div class="relative inline-flex items-center justify-center mb-3">
+            ${scoreRingSvg(c.final_score, 80)}
+            <span class="absolute font-display text-xl font-bold ${colors.text}">${Math.round(c.final_score)}</span>
+          </div>
+          <div class="text-xs font-mono text-slate-500 uppercase tracking-wide">Overall Match</div>
+        </div>
+        <div class="border border-slate-800 rounded-xl p-4 bg-slate-900/40 space-y-3 text-sm">
+          <div class="flex justify-between"><span class="text-slate-500">Semantic fit</span><span class="font-mono text-slate-300">${c.semantic_score}%</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Skill overlap</span><span class="font-mono text-slate-300">${c.skill_score}%</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Experience</span><span class="font-mono text-slate-300">${c.years_experience ? c.years_experience + ' yrs' : '—'}</span></div>
+        </div>
+        <div class="border border-slate-800 rounded-xl p-4 bg-slate-900/40 text-sm space-y-2">
+          <div class="text-slate-500 text-xs font-mono uppercase tracking-wide mb-2">Contact</div>
+          <div class="text-slate-300 truncate">${escapeHtml(c.email || '—')}</div>
+          <div class="text-slate-300">${escapeHtml(c.phone || '—')}</div>
+          <div class="text-slate-600 text-xs truncate mt-2">${escapeHtml(c.filename)}</div>
+        </div>
+      </div>
+
+      <div class="flex-1 space-y-6">
+        <div>
+          <h1 class="font-display text-2xl font-semibold text-slate-100">${escapeHtml(c.name || c.filename)}</h1>
+        </div>
+
+        <div>
+          <h2 class="text-xs font-mono uppercase tracking-wide text-emerald-500 mb-2">✓ Matched Skills (${c.matched_skills.length})</h2>
+          <div class="flex flex-wrap gap-1.5">
+            ${c.matched_skills.length ? c.matched_skills.map(s => `<span class="text-xs font-mono px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${escapeHtml(s)}</span>`).join('') : '<span class="text-slate-600 text-sm">None</span>'}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-xs font-mono uppercase tracking-wide text-rose-500 mb-2">✕ Missing Skills (${c.missing_skills.length})</h2>
+          <div class="flex flex-wrap gap-1.5">
+            ${c.missing_skills.length ? c.missing_skills.map(s => `<span class="text-xs font-mono px-2 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">${escapeHtml(s)}</span>`).join('') : '<span class="text-slate-600 text-sm">None — full coverage</span>'}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-xs font-mono uppercase tracking-wide text-slate-500 mb-2">All Extracted Skills (${c.extracted_skills.length})</h2>
+          <div class="flex flex-wrap gap-1.5">
+            ${c.extracted_skills.map(s => `<span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">${escapeHtml(s)}</span>`).join('')}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-xs font-mono uppercase tracking-wide text-slate-500 mb-2">Resume Text</h2>
+          <pre class="text-xs text-slate-400 bg-slate-950 border border-slate-800 rounded-lg p-4 max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed">${escapeHtml(c.raw_text)}</pre>
+        </div>
+
+        <button onclick="deleteCandidateAndReturn(${c.id})" class="text-rose-500 hover:text-rose-400 text-xs font-mono transition">Delete this candidate</button>
+      </div>
+    </div>
+  `;
+}
+
+async function deleteCandidateAndReturn(id) {
+  if (!confirm('Delete this candidate?')) return;
+  try {
+    await api(`/api/candidates/${id}`, { method: 'DELETE' });
+    goToJobDetail();
+    await loadCandidates();
+  } catch (e) {
+    alert('Failed to delete: ' + e.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// Utils
+// ---------------------------------------------------------------
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------
+checkHealth();
+loadJobs();
+setInterval(checkHealth, 15000);
+</script>
+</body>
+</html>
